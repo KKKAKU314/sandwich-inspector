@@ -1,11 +1,12 @@
 import { ethers } from 'ethers'; 
 import dotenv from 'dotenv';
-dotenv.config({ path: '../config/.env' });
+dotenv.config();
 
 const nodeAddress = process.env.NODE_ADDRESS;
 const provider = new ethers.JsonRpcProvider(nodeAddress);
 const transferEventSignature = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
+const tokenCache = {};
 const ABI_name = ["function name() view returns (string)"];
 const ABI_Decimals = ["function decimals() view returns (uint8)"];
 
@@ -34,8 +35,7 @@ export async function extractRealSandwich(map,blockNumber) {
     const backRunDetailArr = [blockNumber,'Back run', txHashArr[txHashArr.length - 1], backRunTokens, swapPoolArr[swapPoolArr.length - 1], backRunTxReceipt.gasPrice, backRunTxFee, backRunTxReceipt.index];
     txDetailArr.push(frontRunDetailArr);
 
-    if(frontRunTxReceipt.from === backRunTxReceipt.from ||
-       frontRunTxReceipt.to === backRunTxReceipt.to){
+    if(frontRunTxReceipt.from === backRunTxReceipt.from){
         let isSandwich = true;
     // loop victim txs
     for (let i = 1; i < txHashArr.length - 1; i++) {
@@ -145,18 +145,28 @@ async function decodeLogs(receipt) {
 
 
 async function getTokenName(address) {
+    if (tokenCache[address]) {
+        return tokenCache[address].name;
+    }
     try {
         const tokenContract = new ethers.Contract(address, ABI_name, provider);
-        return await tokenContract.name();
+        const name = await tokenContract.name();
+        tokenCache[address] = { name };
+        return name;
     } catch (error) {
         return "Unknown Token";
     }
 }
 
 async function getTokenDecimal(address) {
+    if (tokenCache[address]) {
+        return tokenCache[address].decimals;
+    }
     try {
         const tokenContract = new ethers.Contract(address, ABI_Decimals, provider);
-        return await tokenContract.decimals();
+        const decimals = await tokenContract.decimals();
+        tokenCache[address] = { decimals };
+        return decimals;
     } catch (error) {
         return 18;
     }
